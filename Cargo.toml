@@ -1,6 +1,6 @@
 [package]
 name = "alchemy"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Geir Isene <g@isene.com>"]
 description = "A chemistry bench in the terminal: pour reagents together and watch what happens. Colours, precipitates, gases, salts left behind when the water boils off, flame tests and the iodine clock. Built on crust."

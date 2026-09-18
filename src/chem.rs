@@ -131,7 +131,7 @@ pub static SPECIES: &[Species] = &[
     s("MgO", "magnesia", "MgO", Grit, Some((252, 252, 250)), 1.0, "The white ash left by burning magnesium."),
     s("Fe2O3", "iron oxide", "Fe₂O₃", Grit, Some((160, 60, 30)), 1.0, "Rust. The suite is named after it."),
     s("Al2O3", "alumina", "Al₂O₃", Grit, Some((240, 240, 238)), 1.0, "White and hard. Corundum, ruby, sapphire."),
-    s("I2", "iodine", "I₂", Solid, Some((140, 80, 20)), 1.4, "Grey black flakes that make a brown solution."),
+    s("I2", "iodine", "I₂", Aq, Some((140, 80, 20)), 1.4, "Grey black flakes. In water with an iodide they make a brown solution."),
     s("starch", "starch", "(C₆H₁₀O₅)ₙ", Aq, None, 0.0, "Potato flour in water. Iodine finds it at once."),
     s("H2O2", "hydrogen peroxide", "H₂O₂", Aq, None, 0.0, "Water with one oxygen too many, and keen to lose it."),
     s("KClO3", "potassium chlorate", "KClO₃", Aq, None, 0.0, "An oxidiser. Hands out oxygen to anything that will burn."),
@@ -348,7 +348,7 @@ pub static REACTIONS: &[Reaction] = &[
     // so nothing happens at all until the hypo runs out. Then the iodine
     // has nowhere to go, and the starch catches it.
     r(&[("H2O2", 1.0), ("KI", 2.0), ("H2SO4", 1.0)],
-      &[("I2", 1.0), ("H2O", 2.0), ("Na2SO4", 1.0)], Wet, 40.0, 0.6,
+      &[("I2", 1.0), ("H2O", 2.0), ("Na2SO4", 1.0)], Wet, 40.0, 1.5,
       "nothing to see yet"),
 
     // ── The clock that keeps going ─────────────────────────────────────
