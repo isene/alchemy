@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#141420"/>
+      <stop offset="100%" style="stop-color:#08080e"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f74c00"/>
+      <stop offset="100%" style="stop-color:#b7410e"/>
+    </linearGradient>
+    <linearGradient id="brew" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2fb8d8"/>
+      <stop offset="100%" style="stop-color:#0a6ecd"/>
+    </linearGradient>
+    <clipPath id="inside">
+      <path d="M104 96 L70 176 a42 42 0 0 0 38 24 h40 a42 42 0 0 0 38 -24 L152 96 Z"/>
+    </clipPath>
+  </defs>
+  <style>
+    @keyframes rise { 0% { transform: translateY(0); opacity: 0; }
+                      20% { opacity: 0.9; }
+                      100% { transform: translateY(-46px); opacity: 0; } }
+    .b { animation: rise 2.4s ease-in infinite; }
+    .b2 { animation-delay: 0.8s; }
+    .b3 { animation-delay: 1.6s; }
+    @keyframes lick { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.35); } }
+    .flame { animation: lick 0.7s ease-in-out infinite; transform-origin: 128px 238px; }
+  </style>
+
+  <circle cx="128" cy="128" r="120" fill="url(#bg)" stroke="url(#rust)" stroke-width="3"/>
+
+  <!-- the brew, filling the lower half of the flask -->
+  <g clip-path="url(#inside)">
+    <rect x="60" y="146" width="136" height="60" fill="url(#brew)"/>
+    <circle class="b" cx="98" cy="188" r="5" fill="#bdf0ff" opacity="0.9"/>
+    <circle class="b b2" cx="128" cy="192" r="4" fill="#bdf0ff" opacity="0.9"/>
+    <circle class="b b3" cx="154" cy="186" r="6" fill="#bdf0ff" opacity="0.9"/>
+    <!-- what has settled out: a band of yellow on the bottom -->
+    <rect x="60" y="192" width="136" height="14" fill="#f0c828"/>
+  </g>
+
+  <!-- the flask itself -->
+  <path d="M104 96 L70 176 a42 42 0 0 0 38 24 h40 a42 42 0 0 0 38 -24 L152 96 Z"
+        fill="none" stroke="#cfd6e4" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M104 96 V56 h48 v40" fill="none" stroke="#cfd6e4" stroke-width="5"
+        stroke-linejoin="round"/>
+  <line x1="98" y1="56" x2="158" y2="56" stroke="#cfd6e4" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- violet vapour climbing out of the neck -->
+  <circle class="b" cx="122" cy="52" r="4" fill="#b070e0" opacity="0.8"/>
+  <circle class="b b2" cx="136" cy="48" r="3" fill="#b070e0" opacity="0.8"/>
+
+  <!-- the burner underneath -->
+  <g class="flame">
+    <path d="M128 238 q-13 -14 0 -30 q13 16 0 30 Z" fill="#ff9a2e"/>
+    <path d="M128 236 q-7 -8 0 -17 q7 9 0 17 Z" fill="#7fd4ff"/>
+  </g>
+</svg>
