@@ -459,8 +459,7 @@ impl App {
                 let (first, _) = self.picture_rows(bh);
                 let left = bw.saturating_sub(SLOT * GLASSES) / 2;
                 if let Some(d) = self.pixels.as_mut() {
-                    d.clear_all();
-                    d.show_canvas(&canvas, left as u16 + 1, first as u16 + 2);
+                    d.swap_canvas(&canvas, left as u16 + 1, first as u16 + 2);
                 }
             } else {
                 self.hide_picture();
