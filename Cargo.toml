@@ -1,6 +1,6 @@
 [package]
 name = "alchemy"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["Geir Isene <g@isene.com>"]
 description = "A chemistry bench in the terminal: pour reagents together and watch what happens. Colours, precipitates, gases, salts left behind when the water boils off, flame tests and the iodine clock. Built on crust."
@@ -9,7 +9,7 @@ repository = "https://github.com/isene/alchemy"
 
 [dependencies]
 crust = { version = "0.1", path = "../crust", package = "fe2o3-crust" }
-glow = { version = "0.1.30", path = "../glow", package = "fe2o3-glow" }
+glow = { version = "0.1.32", path = "../glow", package = "fe2o3-glow" }
 
 [profile.release]
 opt-level = 3
