@@ -14,12 +14,13 @@ acid it is.
 Nothing is canned. Every reaction runs at a speed set by how crowded its
 reactants are, so a thin solution takes its time and a dry powder goes
 at once. The picture on screen is drawn from whatever is left in the
-glass.
+glass: in real pixels in glass, or any terminal that shows images, and
+in character cells elsewhere.
 
 Part of the [Fe₂O₃ suite](https://isene.github.io/fe2o3/). Built on
 [crust](https://github.com/isene/crust).
 
-![Golden rain: lead iodide falling through the water, with the panel naming everything in the tube](img/screenshot.png)
+![Golden rain settled in the second tube, a potassium flame over it, the burner under the third, and the panel naming everything in the tube](img/screenshot.png)
 
 ## What you can see
 

@@ -186,6 +186,7 @@ fn main() {
         app.render();
     }
     app.save();
+    app.hide_picture();
     Crust::cleanup();
 }
 
@@ -207,6 +208,8 @@ struct App {
     shown: [String; 2],
     rows: Vec<String>,
     dirty: bool,
+    /// The bench as a picture, where the terminal shows images.
+    pixels: Option<glow::Display>,
 }
 
 impl App {
@@ -226,6 +229,7 @@ impl App {
             shown: Default::default(),
             rows: Vec::new(),
             dirty: true,
+            pixels: None,
         }
     }
 
@@ -357,6 +361,7 @@ impl App {
     }
 
     fn pick_experiment(&mut self) {
+        self.hide_picture();
         let mut lines = vec![" Free play  (no goal, the whole shelf)".to_string()];
         for (i, l) in LESSONS.iter().enumerate() {
             let tick = if self.done[i + 1] { "✓" } else { " " };
@@ -373,6 +378,7 @@ impl App {
     }
 
     fn menu(&mut self, title: &str, lines: &[String]) -> Option<usize> {
+        self.hide_picture();
         let w = lines.iter().map(|l| l.chars().count()).max().unwrap_or(20).max(title.len()) + 4;
         let mut p = self.lower_right(w as u16, lines.len() as u16 + 2);
         p.pane.border_fg = Some(109);
@@ -380,6 +386,7 @@ impl App {
     }
 
     fn popup(&mut self, text: &str, w: u16) {
+        self.hide_picture();
         let (cols, rows) = Crust::terminal_size();
         let h = (text.lines().count() as u16 + 2).min(rows.saturating_sub(2));
         let w = w.min(cols.saturating_sub(4));
@@ -404,6 +411,7 @@ impl App {
     }
 
     fn redraw(&mut self) {
+        self.hide_picture();
         Crust::clear_screen();
         self.shown = Default::default();
         self.rows.clear();
@@ -428,8 +436,9 @@ impl App {
             self.shown[0] = head;
         }
 
+        let pixels = self.pixels.get_or_insert_with(glow::Display::new).supported();
         if self.dirty {
-            let lines = self.bench_lines(bw, bh);
+            let lines = self.bench_lines(bw, bh, pixels);
             if self.rows.len() != lines.len() { self.rows = vec![String::new(); lines.len()]; }
             let mut frame = String::new();
             for (i, line) in lines.into_iter().enumerate() {
@@ -444,6 +453,17 @@ impl App {
                 let mut out = std::io::stdout();
                 let _ = out.write_all(frame.as_bytes());
                 let _ = out.flush();
+            }
+            if pixels && self.blind.is_none() {
+                let canvas = self.bench_canvas(bh, glow::get_cell_size());
+                let (first, _) = self.picture_rows(bh);
+                let left = bw.saturating_sub(SLOT * GLASSES) / 2;
+                if let Some(d) = self.pixels.as_mut() {
+                    d.clear_all();
+                    d.show_canvas(&canvas, left as u16 + 1, first as u16 + 2);
+                }
+            } else {
+                self.hide_picture();
             }
             self.dirty = false;
         }
@@ -483,7 +503,7 @@ impl App {
     }
 
     /// The bench, one string per row, ANSI and all.
-    fn bench_lines(&self, bw: usize, bh: usize) -> Vec<String> {
+    fn bench_lines(&self, bw: usize, bh: usize, pixels: bool) -> Vec<String> {
         if let Some(_) = self.blind { return self.blind_lines(bw, bh); }
         let block = VAP + GH + 3;
         let top = (bh.saturating_sub(block)) / 2;
@@ -491,7 +511,7 @@ impl App {
         let mut out = vec![String::new(); bh];
 
         for (i, v) in self.bench.iter().enumerate() {
-            let cells = self.glass_cells(v, i);
+            let cells = self.glass_cells(v, i, pixels);
             for (r, row) in cells.into_iter().enumerate() {
                 let y = top + r;
                 if y >= bh { break; }
@@ -499,8 +519,8 @@ impl App {
                 out[y].push_str(&row);
             }
         }
-        // A flame test burns above the bench.
-        if let Some((rgb, _, _)) = self.flame {
+        // A flame test burns above the bench; in the picture it is drawn there.
+        if let (Some((rgb, _, _)), false) = (self.flame, pixels) {
             let torch = "▲▲▲";
             let y = top.saturating_sub(1);
             let pad = left + self.cur * SLOT + SLOT / 2 - 1;
@@ -544,9 +564,19 @@ impl App {
     }
 
     /// One glass drawn as a column of rows, each already padded to SLOT.
-    fn glass_cells(&self, v: &Vessel, i: usize) -> Vec<String> {
+    /// With `pixels` the glass itself is left blank for the picture, and
+    /// only the label is text.
+    fn glass_cells(&self, v: &Vessel, i: usize, pixels: bool) -> Vec<String> {
         let mut rows: Vec<String> = Vec::with_capacity(VAP + GH + 3);
         let picked = i == self.cur;
+        if pixels {
+            rows.resize(VAP + GH + 1, " ".repeat(SLOT));
+            let name = format!("{} {}", i + 1, v.glass.name());
+            let label = if picked { style::fb(&format!(" {name} "), 232, 250) } else { style::fg(&name, 244) };
+            rows.push(fit(&format!("{}{label}", " ".repeat((SLOT - name.chars().count() - 2) / 2)), SLOT));
+            rows.push(" ".repeat(SLOT));
+            return rows;
+        }
         let wall = if picked { 231u8 } else { 246u8 };
         let inner = |r: usize| -> usize {
             match v.glass {
@@ -625,6 +655,148 @@ impl App {
         let _ = widest;
         rows.push(" ".repeat(SLOT));
         rows
+    }
+
+    // ── The bench as a picture ─────────────────────────────────────────
+
+    /// Take the picture down. render puts it back on the next dirty frame.
+    fn hide_picture(&mut self) {
+        if let Some(d) = self.pixels.as_mut() { d.clear_all(); }
+    }
+
+    /// The bench lines the picture covers: the first one, and how many.
+    /// The torch row above the glasses, the vapour, the glasses and the
+    /// burner row; the labels below stay text.
+    fn picture_rows(&self, bh: usize) -> (usize, usize) {
+        let top = bh.saturating_sub(VAP + GH + 3) / 2;
+        let first = top.saturating_sub(1);
+        (first, top + VAP + GH + 1 - first)
+    }
+
+    /// The four glasses as a picture, see-through where nothing is drawn,
+    /// for cells of `cell` pixels.
+    fn bench_canvas(&self, bh: usize, cell: (u16, u16)) -> glow::Canvas {
+        let top = bh.saturating_sub(VAP + GH + 3) / 2;
+        let (first, rows) = self.picture_rows(bh);
+        let mut c = glow::Canvas::with_cell((SLOT * GLASSES) as u16, rows as u16, cell);
+        for px in c.rgba.chunks_mut(4) { px[3] = 0; }
+        let (cw, ch) = (c.cell.0 as f64, c.cell.1 as f64);
+        let mouth = (top + VAP - first) as f64 * ch;
+        for (i, v) in self.bench.iter().enumerate() {
+            let cx = (i as f64 + 0.5) * SLOT as f64 * cw;
+            self.draw_glass(&mut c, v, i, cx, mouth, cw, ch);
+        }
+        if let Some((rgb, _, _)) = self.flame {
+            let cx = (self.cur as f64 + 0.5) * SLOT as f64 * cw;
+            flame(&mut c, cx, mouth - ch * 0.4, ch * 1.6, cw * 1.4, rgb, self.frame);
+        }
+        settle_alpha(&mut c);
+        c
+    }
+
+    /// One glass at centre `cx` with its mouth at `mouth`: the walls, what
+    /// is in it, the bubbles, the vapour over it and the burner under it.
+    fn draw_glass(&self, c: &mut glow::Canvas, v: &Vessel, i: usize, cx: f64, mouth: f64, cw: f64, ch: f64) {
+        let picked = i == self.cur;
+        let wall = if picked { (235, 235, 235) } else { (150, 150, 150) };
+        let height = GH as f64 * ch - 2.0;
+        let floor = mouth + height;
+        // Half the inside width at `t`, 0 at the mouth and 1 at the floor.
+        let half = |t: f64| -> f64 {
+            match v.glass {
+                Glass::Tube => 2.0 * cw,
+                Glass::Beaker => 4.5 * cw,
+                Glass::Flask => if t < 0.25 { 1.5 * cw } else { 1.5 * cw + 4.0 * cw * (t - 0.25) / 0.75 },
+            }
+        };
+        let hw_at = |y: f64| -> f64 {
+            let hw = half(((y - mouth) / height).clamp(0.0, 1.0));
+            match v.glass {
+                // A tube's floor is round.
+                Glass::Tube if y > floor - 2.0 * cw => {
+                    let r = 2.0 * cw;
+                    let dy = y - (floor - r);
+                    (r * r - dy * dy).max(0.0).sqrt()
+                }
+                _ => hw,
+            }
+        };
+        let liquid = v.liquid_rgb();
+        let level = v.level() * (height - ch);
+        let surface = floor - 2.0 - level;
+        let grit = v.settled().map(|(rgb, amount)| (rgb, (amount * 0.15).ceil().clamp(1.0, (GH - 1) as f64) * ch * 0.5));
+        for y in mouth.floor() as i64..=floor.ceil() as i64 {
+            let yf = y as f64 + 0.5;
+            let hw = hw_at(yf);
+            if hw <= 0.0 || yf < mouth { continue; }
+            let flat_floor = v.glass != Glass::Tube && yf > floor - 2.0;
+            for x in (cx - hw - 1.0).floor() as i64..=(cx + hw + 1.0).ceil() as i64 {
+                let dx = (x as f64 + 0.5 - cx).abs();
+                if dx > hw { continue; }
+                if flat_floor || dx > hw - 2.0 {
+                    blend(c, x, y, wall, 1.0);
+                    continue;
+                }
+                let mut painted = false;
+                if v.flare > 0.0 {
+                    blend(c, x, y, v.flare_rgb, 1.0);
+                    painted = true;
+                } else {
+                    if let Some((rgb, gh)) = grit {
+                        let bump = (self.noise(i, 0, x as usize) % 5) as f64;
+                        if yf > floor - 2.0 - gh - bump {
+                            let k = 0.8 + (self.noise(i, y as usize, x as usize) % 40) as f64 / 100.0;
+                            blend(c, x, y, scale(rgb, k), 1.0);
+                            painted = true;
+                        }
+                    }
+                    if !painted && level > 0.5 {
+                        // The meniscus climbs the wall a little.
+                        let climb = if hw - dx < 6.0 { (6.0 - (hw - dx)) * 0.5 } else { 0.0 };
+                        if yf >= surface - climb {
+                            let base = liquid.unwrap_or((198, 222, 236));
+                            let depth = ((yf - surface) / (floor - surface).max(1.0)).clamp(0.0, 1.0);
+                            blend(c, x, y, scale(base, 1.0 - 0.15 * depth), 0.92);
+                            painted = true;
+                        }
+                    }
+                }
+                // A highlight down the left wall of whatever is in the glass.
+                if painted && (x as f64) < cx && dx > hw - 6.0 && dx < hw - 3.0 {
+                    blend(c, x, y, (255, 255, 255), 0.22);
+                }
+            }
+        }
+        // Bubbles rising through the liquid.
+        if v.fizz > 1e-3 && level > 4.0 {
+            let n = (level / ch * 2.5).ceil() as usize;
+            for k in 0..n {
+                let r = self.noise(i, k + 7, 3);
+                let by = floor - 4.0 - ((r >> 8) % 1000) as f64 / 1000.0 * (level - 6.0);
+                let hw = hw_at(by) - 5.0;
+                if hw <= 2.0 { continue; }
+                let bx = cx - hw + (r % 1000) as f64 / 1000.0 * 2.0 * hw;
+                ring(c, bx, by, 2.2, (255, 255, 255), 0.75);
+            }
+        }
+        // Vapour over the mouth.
+        if let Some(rgb) = v.vapour() {
+            if v.volume() > 0.1 || v.temp > 40.0 {
+                let hw = half(0.0);
+                let reach = VAP as f64 * ch;
+                for k in 0..5 {
+                    let r = self.noise(i, 90 + k, 1);
+                    let px = cx - hw + (r % 1000) as f64 / 1000.0 * 2.0 * hw;
+                    let rise = ((r >> 10) % 1000) as f64 / 1000.0 * (reach - 8.0);
+                    puff(c, px, mouth - 6.0 - rise, 5.0 + (k % 3) as f64 * 2.0, rgb, 0.35 * (1.0 - rise / reach));
+                }
+            }
+        }
+        // The burner under the glass.
+        if v.burner {
+            let rgb = if v.temp > 60.0 { (255, 170, 40) } else { (120, 160, 240) };
+            flame(c, cx, floor + ch - 1.0, ch * 1.15, cw * 1.6, rgb, self.frame + i as u64 * 3);
+        }
     }
 
     /// A cheap repeatable scatter, so bubbles and vapour move without a
@@ -718,6 +890,88 @@ impl App {
     }
 }
 
+// ── Pixel helpers for the picture ────────────────────────────────────
+
+fn scale(rgb: Rgb, k: f64) -> Rgb {
+    let f = |v: u8| (v as f64 * k).round().clamp(0.0, 255.0) as u8;
+    (f(rgb.0), f(rgb.1), f(rgb.2))
+}
+
+/// Paint `rgb` over the pixel with cover `a`, the way glass over glass
+/// adds up: what was there shows through by what is left.
+fn blend(c: &mut glow::Canvas, x: i64, y: i64, rgb: Rgb, a: f64) {
+    if x < 0 || y < 0 || x as usize >= c.w || y as usize >= c.h { return; }
+    let o = (y as usize * c.w + x as usize) * 4;
+    let a = a.clamp(0.0, 1.0);
+    let da = c.rgba[o + 3] as f64 / 255.0;
+    let out = a + da * (1.0 - a);
+    if out <= 0.0 { return; }
+    for (k, s) in [rgb.0, rgb.1, rgb.2].into_iter().enumerate() {
+        let d = c.rgba[o + k] as f64;
+        c.rgba[o + k] = ((s as f64 * a + d * da * (1.0 - a)) / out).round().clamp(0.0, 255.0) as u8;
+    }
+    c.rgba[o + 3] = (out * 255.0).round() as u8;
+}
+
+/// The terminal draws a pixel either in full or not at all, so a
+/// half-covered one is settled by an ordered dither: soft edges and
+/// thin vapour become a sprinkle, the way they would in print.
+fn settle_alpha(c: &mut glow::Canvas) {
+    const BAYER: [[u8; 4]; 4] = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
+    for y in 0..c.h {
+        for x in 0..c.w {
+            let o = (y * c.w + x) * 4;
+            let a = c.rgba[o + 3];
+            if a == 0 || a == 255 { continue; }
+            let t = BAYER[y % 4][x % 4] * 16 + 8;
+            c.rgba[o + 3] = if a > t { 255 } else { 0 };
+        }
+    }
+}
+
+/// A one-pixel ring, for a bubble.
+fn ring(c: &mut glow::Canvas, x: f64, y: f64, r: f64, rgb: Rgb, a: f64) {
+    for py in (y - r - 1.0).floor() as i64..=(y + r + 1.0).ceil() as i64 {
+        for px in (x - r - 1.0).floor() as i64..=(x + r + 1.0).ceil() as i64 {
+            let d = ((px as f64 + 0.5 - x).powi(2) + (py as f64 + 0.5 - y).powi(2)).sqrt();
+            let k = 1.0 - (d - r).abs();
+            if k > 0.0 { blend(c, px, py, rgb, a * k); }
+        }
+    }
+}
+
+/// A soft blob whose cover fades to nothing at `r`, for vapour.
+fn puff(c: &mut glow::Canvas, x: f64, y: f64, r: f64, rgb: Rgb, a: f64) {
+    for py in (y - r).floor() as i64..=(y + r).ceil() as i64 {
+        for px in (x - r).floor() as i64..=(x + r).ceil() as i64 {
+            let d = ((px as f64 + 0.5 - x).powi(2) + (py as f64 + 0.5 - y).powi(2)).sqrt() / r;
+            if d < 1.0 { blend(c, px, py, rgb, a * (1.0 - d * d)); }
+        }
+    }
+}
+
+/// A flame standing on `base`, `height` tall and `half_w` wide at its
+/// widest, in `rgb` with a paler core, flickering with `frame`.
+fn flame(c: &mut glow::Canvas, cx: f64, base: f64, height: f64, half_w: f64, rgb: Rgb, frame: u64) {
+    let height = height * (0.88 + 0.04 * ((frame / 2) % 4) as f64);
+    let lean = ((frame / 3) % 3) as f64 - 1.0;
+    let core = scale((rgb.0.max(200), rgb.1.max(200), rgb.2.max(160)), 1.0);
+    for py in (base - height).floor() as i64..=base.ceil() as i64 {
+        let u = ((base - (py as f64 + 0.5)) / height).clamp(0.0, 1.0);
+        // Widest a third of the way up, a point at the tip.
+        let w = half_w * (std::f64::consts::PI * u.powf(0.7)).sin().max(0.0);
+        if w <= 0.0 { continue; }
+        let mid = cx + lean * u * 1.5;
+        for px in (mid - w - 1.0).floor() as i64..=(mid + w + 1.0).ceil() as i64 {
+            let d = (px as f64 + 0.5 - mid).abs() / w;
+            if d >= 1.0 { continue; }
+            let a = (1.0 - d * d) * (1.0 - u * 0.5);
+            let col = if d < 0.4 && u < 0.6 { core } else { rgb };
+            blend(c, px, py, col, a);
+        }
+    }
+}
+
 fn dir() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
     PathBuf::from(home).join(".alchemy")
@@ -808,6 +1062,26 @@ mod tests {
     fn a_row_is_padded_to_the_slot() {
         let painted = style::rgb("ab", Some((1, 2, 3)), None, "");
         assert_eq!(crust::strip_ansi(&fit(&painted, 6)).chars().count(), 6);
+    }
+
+    #[test]
+    fn the_picture_shows_the_liquid_and_the_burner_and_nothing_else() {
+        let mut app = App::new();
+        app.bench[0].add("H2O", 15.0 * PER_ML);
+        app.bench[0].add("CuSO4", 10.0);
+        app.bench[1].burner = true;
+        let c = app.bench_canvas(40, (10, 20));
+        assert_eq!((c.w, c.h), (600, 320));
+        let at = |x: usize, y: usize| { let o = (y * c.w + x) * 4; (c.rgba[o], c.rgba[o + 1], c.rgba[o + 2], c.rgba[o + 3]) };
+        assert_eq!(at(2, 2).3, 0, "the corner is see-through");
+        // Glass 1 sits in the first slot: liquid low in the tube is blue-ish and solid.
+        let (r, g, b, a) = at(75, 270);
+        assert!(a == 255 && b > r && b > 100, "liquid pixel {r} {g} {b} {a}");
+        assert!(c.rgba.chunks(4).all(|p| p[3] == 0 || p[3] == 255), "every pixel is drawn or not");
+        assert_eq!(at(75, 120).3, 0, "the empty part of the tube is see-through");
+        // Glass 2's burner flame sits in the bottom row of its slot.
+        let lit = (0..320usize).flat_map(|y| (150..300usize).map(move |x| (x, y))).filter(|&(x, y)| y > 300 && at(x, y).3 > 60).count();
+        assert!(lit > 20, "only {lit} flame pixels");
     }
 
     #[test]
