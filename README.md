@@ -20,7 +20,7 @@ in character cells elsewhere.
 Part of the [Fe₂O₃ suite](https://isene.github.io/fe2o3/). Built on
 [crust](https://github.com/isene/crust).
 
-![Golden rain settled in the second tube, a potassium flame over it, the burner under the third, and the panel naming everything in the tube](img/screenshot.png)
+![Golden rain settled in the second tube, a potassium flame over it, the burner under the third](img/screenshot.png)
 
 ## What you can see
 
