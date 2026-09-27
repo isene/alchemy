@@ -141,6 +141,7 @@ const HELP: &str = "\
  s             the safety screen, up or down
 
  x             the experiments
+ Ctrl+A        ask Claude about the bench
  n             the next experiment
  ?             this
  q             quit
@@ -319,9 +320,34 @@ impl App {
                 self.save();
             }
             "?" => self.popup(HELP, 66),
+            "C-A" => self.claude(),
             _ => {}
         }
         false
+    }
+
+    /// Ctrl+A, as in every Fe2O3 app: a Claude session about the bench,
+    /// the picked glass first, with the experiment.
+    fn claude(&mut self) {
+        let mut ctx = format!(
+            "{}\n\nThe picked glass, as the side panel shows it:\n{}\n",
+            crust::strip_ansi(&self.shown[0]),
+            crust::strip_ansi(&self.info(60, 60)),
+        );
+        let (cur, mode) = (self.cur, self.mode);
+        // The other glasses without the experiment's text, said once above.
+        self.mode = 0;
+        for i in (0..GLASSES).filter(|&i| i != cur && !self.bench[i].is_empty()) {
+            self.cur = i;
+            ctx.push_str(&format!("\nAnother glass:\n{}\n", crust::strip_ansi(&self.info(60, 60))));
+        }
+        (self.cur, self.mode) = (cur, mode);
+        self.hide_picture();
+        let intro = "I am in alchemy, my chemistry bench app: I pour reagents together and watch what happens.";
+        if !crust::claude_session("Alchemy", intro, &ctx) {
+            self.note = Some("claude is not on the PATH".into());
+        }
+        self.redraw();
     }
 
     fn flame_test(&mut self) {

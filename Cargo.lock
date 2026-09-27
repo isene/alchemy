@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "alchemy"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "fe2o3-crust",
  "fe2o3-glow",
@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "fe2o3-crust"
-version = "0.1.55"
+version = "0.1.57"
 dependencies = [
  "crossterm",
  "libc",
@@ -134,7 +134,7 @@ dependencies = [
 
 [[package]]
 name = "fe2o3-glow"
-version = "0.1.33"
+version = "0.1.42"
 dependencies = [
  "base64",
  "image",

@@ -66,6 +66,7 @@ Each one ticks itself off when the bench shows what it asked for.
 | `t` | a flame test |
 | `s` | the safety screen, up or down |
 | `x` | the experiments |
+| `Ctrl+A` | a Claude session about the bench and the experiment (`claude` on the PATH); `/exit` comes back |
 | `n` | the next experiment |
 | `?` | help |
 | `q` | quit |
