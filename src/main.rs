@@ -319,7 +319,7 @@ impl App {
                 self.note = None;
                 self.save();
             }
-            "?" => self.popup(HELP, 66),
+            "?" => self.popup(&crust::key_help(HELP), 66),
             "C-A" => self.claude(),
             _ => {}
         }
